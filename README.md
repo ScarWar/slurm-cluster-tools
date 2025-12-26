@@ -13,6 +13,25 @@ A collection of bash scripts and aliases for managing SLURM jobs on HPC clusters
 
 ## Installation
 
+### Quick Install (Recommended)
+
+Run the interactive installation script:
+
+```bash
+git clone git@github.com:ScarWar/slurm-cluster-tools.git
+cd slurm-cluster-tools
+chmod +x install.sh
+./install.sh
+```
+
+The script will:
+- Automatically detect your shell (bash, zsh, tcsh, or csh)
+- Prompt for configuration with sensible defaults
+- Set up aliases and completion in your shell config file
+- Create backups of existing configuration files
+
+### Manual Installation
+
 1. Clone this repository:
 ```bash
 git clone git@github.com:ScarWar/slurm-cluster-tools.git
