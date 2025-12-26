@@ -1,260 +1,250 @@
-# SLURM Cluster Management Tools
+# slx - SLurm eXtended
 
-A collection of bash scripts and aliases for managing SLURM jobs on HPC clusters. This toolkit provides convenient commands for submitting jobs, viewing logs, monitoring job status, and more.
+A production-ready SLURM project manager for HPC clusters. Manage jobs, create projects, and generate sbatch files with ease.
 
 ## Features
 
-- 🚀 **Easy job submission** - Submit SLURM jobs with a single command
-- 📊 **Job monitoring** - List, view, and track running/pending jobs
-- 📝 **Log management** - View and tail job logs easily
-- 🎯 **Quick aliases** - Short commands for common operations
-- 🧹 **Log cleanup** - Interactive cleanup of old log files
-- ⌨️ **Command completion** - Tab completion for commands, job IDs, and filenames
+- **Project Management** - Create and manage SLURM projects with generated sbatch/run scripts
+- **Job Operations** - Submit, list, kill, and monitor SLURM jobs
+- **Interactive Setup** - Configure cluster settings once, use everywhere
+- **Tab Completion** - Full bash/zsh completion support
+- **Short Aliases** - Optional quick aliases (`cs`, `cl`, `ck`, etc.)
+- **Cluster-Friendly** - Separates config (HOME) from data (WORKDIR) for limited quotas
 
 ## Installation
 
-### Quick Install (Recommended)
-
-Run the interactive installation script:
+### Quick Install
 
 ```bash
 git clone git@github.com:ScarWar/slurm-cluster-tools.git
 cd slurm-cluster-tools
-chmod +x bin/install.sh
 ./bin/install.sh
 ```
 
-The script will:
-- Automatically detect your shell (bash, zsh, tcsh, or csh)
-- Prompt for configuration with sensible defaults
-- Set up aliases and completion in your shell config file
-- Create backups of existing configuration files
+The installer will:
+- Copy slx to `~/.local/share/slx/`
+- Create the `slx` command in `~/.local/bin/`
+- Set up configuration in `~/.config/slx/`
+- Optionally configure aliases and tab completion
 
-### Manual Installation
+### After Installation
 
-1. Clone this repository:
-```bash
-git clone git@github.com:ScarWar/slurm-cluster-tools.git
-cd slurm-cluster-tools
+1. Start a new shell session, or run: `source ~/.bashrc` (or your shell's rc file)
+2. Initialize slx for your cluster: `slx init`
+3. Create your first project: `slx project new`
+
+## Install Layout
+
 ```
+~/.local/
+├── bin/
+│   └── slx                    # Main command (wrapper)
+└── share/
+    └── slx/                   # Tool payload
+        ├── bin/slx            # Main CLI script
+        ├── completions/       # Tab completion scripts
+        └── templates/         # Project templates
 
-2. Make the script executable:
-```bash
-chmod +x bin/cluster.sh
-```
+~/.config/
+└── slx/
+    ├── config.env             # User configuration
+    └── aliases.sh             # Shell aliases (if enabled)
 
-3. Source the appropriate alias file for your shell:
-
-**For bash/zsh:**
-```bash
-source cluster_aliases.sh
-```
-
-**For tcsh:**
-```bash
-source cluster_aliases.tcsh
-```
-
-4. (Optional) Add to your shell configuration file for permanent access:
-
-**For bash/zsh** (`~/.bashrc` or `~/.zshrc`):
-```bash
-export CLUSTER_WORKDIR="$HOME/workdir"  # or your custom path
-source $CLUSTER_WORKDIR/cluster_aliases.sh
-```
-
-**For tcsh** (`~/.tcshrc`):
-```bash
-setenv CLUSTER_WORKDIR $HOME/workdir  # or your custom path
-source $CLUSTER_WORKDIR/cluster_aliases.tcsh
-```
-
-**Note:** Command completion is automatically enabled when you source `cluster_aliases.sh` for bash. For zsh, you may need to manually source `cluster-completion.zsh` or add it to your `~/.zshrc`.
-
-## Configuration
-
-The tools use environment variables for configuration:
-
-- `CLUSTER_WORKDIR` - Directory where cluster tools are located (defaults to `$HOME/workdir`)
-- `SLURM_LOG_DIR` - Directory where SLURM logs are stored (defaults to `slurm/logs`)
-
-## Command Completion
-
-The toolkit includes tab completion for enhanced productivity:
-
-### Bash Completion
-
-Completion is automatically enabled when you source `cluster_aliases.sh`. It provides:
-
-- **Command completion**: Tab to complete command names (submit, list, logs, etc.)
-- **File completion**: For `submit` command, tab completes `.sbatch` files
-- **Job ID completion**: For `logs`, `tail`, `kill`, `info` commands, tab completes active job IDs
-- **Job name completion**: For `find` command, tab completes job names
-- **Option completion**: Tab completes options like `--user` and `--days`
-
-**Manual setup** (if not using aliases):
-```bash
-source /path/to/cluster-completion.bash
-```
-
-### Zsh Completion
-
-For zsh users, source the zsh completion file:
-
-```bash
-# Add to ~/.zshrc
-source /path/to/cluster-completion.zsh
-```
-
-Or add to your fpath:
-```bash
-fpath=(/path/to/directory $fpath)
-autoload -U compinit && compinit
-```
-
-### Completion Examples
-
-```bash
-# Tab completion for commands
-./cluster.sh <TAB>          # Shows: submit, list, logs, kill, etc.
-
-# Tab completion for job files
-cs <TAB>                     # Shows all .sbatch files
-
-# Tab completion for job IDs
-cl <TAB>                     # Shows all active job IDs
-ck <TAB>                     # Shows all active job IDs
-
-# Tab completion for job names
-cf <TAB>                     # Shows all job names
+$WORKDIR/
+└── projects/
+    └── my-project/            # Your projects
+        ├── run.sh             # Main script
+        ├── run.sbatch         # SLURM job file
+        └── logs/              # Job output logs
 ```
 
 ## Usage
 
-### Direct Script Usage
+### Initialize slx
+
+Configure slx for your cluster (run once):
 
 ```bash
-./cluster.sh <command> [options]
+slx init
 ```
 
-### Using Aliases (Recommended)
+This prompts for:
+- **WORKDIR**: Where to store projects (use a large mount, not HOME)
+- **Default job settings**: Partition, account, QoS, time, memory, GPUs, etc.
 
-Once you've sourced the alias file, you can use short commands:
+### Project Commands
+
+```bash
+# Create a new project
+slx project new
+
+# List all projects
+slx project list
+
+# Submit a project job
+slx project submit my-project
+```
+
+### Job Commands
+
+```bash
+# Submit a job script directly
+slx submit job.sbatch
+
+# List your jobs
+slx list
+slx running          # Only running jobs
+slx pending          # Only pending jobs
+
+# View job information
+slx info 123456
+slx info 123456 -n   # Show only allocated nodes
+
+# View job logs
+slx logs 123456
+slx tail 123456      # Follow logs in real-time
+
+# Cancel jobs
+slx kill 123456
+slx killall          # Cancel all your jobs
+
+# Job history and search
+slx status
+slx history --days 7
+slx find jupyter
+
+# Cleanup old logs
+slx clean
+```
+
+## Aliases
+
+If you enabled aliases during installation, you can use these shortcuts:
 
 | Alias | Command | Description |
 |-------|---------|-------------|
-| `c` | `cluster` | Base command (shows help) |
-| `cs` | `cluster submit` | Submit a job script |
-| `cl` | `cluster logs` | View job logs |
-| `cls` | `cluster list` | List all jobs |
-| `cr` | `cluster running` | List running jobs |
-| `cpd` | `cluster pending` | List pending jobs |
-| `ck` | `cluster kill` | Kill a job |
-| `cka` | `cluster killall` | Kill all jobs |
-| `ct` | `cluster tail` | Tail logs in real-time |
-| `ci` | `cluster info` | Show job info |
-| `cst` | `cluster status` | Show status summary |
-| `ch` | `cluster history` | Show job history |
-| `cf` | `cluster find` | Find jobs by pattern |
-| `ccl` | `cluster clean` | Clean old logs |
+| `c` | `slx` | Base command |
+| `cs` | `slx submit` | Submit a job |
+| `cl` | `slx logs` | View logs |
+| `cls` | `slx list` | List jobs |
+| `cr` | `slx running` | Running jobs |
+| `cpd` | `slx pending` | Pending jobs |
+| `ck` | `slx kill` | Kill a job |
+| `cka` | `slx killall` | Kill all jobs |
+| `ct` | `slx tail` | Tail logs |
+| `ci` | `slx info` | Job info |
+| `cst` | `slx status` | Status summary |
+| `ch` | `slx history` | Job history |
+| `cf` | `slx find` | Find jobs |
+| `ccl` | `slx clean` | Clean logs |
+| `cpn` | `slx project new` | New project |
+| `cps` | `slx project submit` | Submit project |
+| `cpl` | `slx project list` | List projects |
 
-**Note:** `cpd` and `ccl` are used instead of `cp` and `cc` to avoid conflicts with the standard Unix `cp` (copy) and `cc` (C compiler) commands.
+## Configuration
 
-## Commands
-
-### Submit a Job
-
-```bash
-cs jupyter.sbatch
-# or
-./cluster.sh submit jupyter.sbatch
-```
-
-### List Jobs
+Configuration is stored in `~/.config/slx/config.env`:
 
 ```bash
-cls                    # List all your jobs
-cls --user username    # List jobs for specific user
-cr                     # List only running jobs
-cpd                    # List only pending jobs
+# Base directory for projects (use a large mount)
+SLX_WORKDIR="/scratch/$USER/workdir"
+
+# Default SLURM job settings
+SLX_PARTITION="gpu"
+SLX_ACCOUNT="my-account"
+SLX_QOS="normal"
+SLX_TIME="1440"
+SLX_NODES="1"
+SLX_NTASKS="1"
+SLX_CPUS="4"
+SLX_MEM="50000"
+SLX_GPUS="1"
+SLX_EXCLUDE="node-01,node-02"
 ```
 
-### View Logs
+Run `slx init` to update these settings interactively.
+
+## Project Structure
+
+When you run `slx project new`, it creates:
+
+```
+$WORKDIR/projects/my-project/
+├── run.sh           # Your main script (edit this!)
+├── run.sbatch       # SLURM job file (auto-generated)
+└── logs/            # Job output logs
+    ├── my-project_123456.out
+    └── my-project_123456.err
+```
+
+### run.sh
+
+This is your main script. Edit it to run your code:
 
 ```bash
-cl 123456              # View complete logs for job 123456
-ct 123456              # Tail logs in real-time
+#!/bin/bash
+echo "Starting my-project..."
+
+# Activate environment
+source /path/to/venv/bin/activate
+
+# Run your code
+python train.py --gpus=${SLURM_GPUS}
+
+echo "Job completed!"
 ```
 
-### Manage Jobs
+### run.sbatch
+
+The sbatch file is auto-generated with your settings. It:
+- Sets SLURM job parameters
+- Changes to the project directory
+- Runs `run.sh`
+- Saves logs to `logs/`
+
+## Tab Completion
+
+Tab completion is available for bash and zsh:
 
 ```bash
-ck 123456              # Kill a specific job
-cka                    # Kill all your jobs (with confirmation)
-ci 123456              # Show detailed job information
-ci 123456 --nodes      # Show only the nodes allocated to the job
-ci 123456 -n           # Short form: show only nodes
-```
-
-### Monitor Jobs
-
-```bash
-cst                    # Show summary of all jobs
-ch                     # Show job history (last day)
-ch --days 7            # Show job history (last 7 days)
-cf jupyter             # Find jobs matching "jupyter"
-```
-
-### Cleanup
-
-```bash
-ccl                    # Interactive cleanup of old log files
-```
-
-## Examples
-
-```bash
-# Submit a new job
-cs my_job.sbatch
-
-# Check job status
-cst
-
-# View logs for a running job
-cl 123456
-
-# Monitor logs in real-time
-ct 123456
-
-# Kill a stuck job
-ck 123456
-
-# Find all jupyter jobs
-cf jupyter
-```
-
-## File Structure
-
-```
-.
-├── bin/
-│   ├── install.sh              # Interactive installation script
-│   └── cluster.sh              # Main cluster management script
-├── completions/
-│   ├── cluster-completion.bash # Bash completion script
-│   └── cluster-completion.zsh  # Zsh completion script
-├── cluster_aliases.sh          # Bash/zsh aliases (auto-loads completion)
-├── cluster_aliases.tcsh        # tcsh aliases
-├── LICENSE                     # MIT License
-├── .gitignore                  # Git ignore patterns
-└── README.md                   # This file
+slx <TAB>                    # Show all commands
+slx project <TAB>            # Show project subcommands
+slx project submit <TAB>     # Complete project names
+slx logs <TAB>               # Complete job IDs
 ```
 
 ## Requirements
 
 - SLURM workload manager
-- Bash shell
-- Standard Unix utilities (grep, tail, find, etc.)
+- Bash shell (for the tool itself)
+- rsync (for installation, with fallback to cp)
+
+## File Structure (Repository)
+
+```
+.
+├── bin/
+│   ├── slx                  # Main CLI
+│   ├── cluster.sh           # Deprecated wrapper
+│   └── install.sh           # Installation script
+├── completions/
+│   ├── slx.bash             # Bash completion
+│   └── slx.zsh              # Zsh completion
+├── templates/
+│   ├── run.sh.tmpl          # Run script template
+│   └── job.sbatch.tmpl      # Sbatch template
+├── LICENSE                  # MIT License
+├── .gitignore
+└── README.md
+```
+
+## Why Separate HOME and WORKDIR?
+
+Many HPC clusters have:
+- **Limited HOME quota** (e.g., 10GB) - for config files
+- **Large scratch/data mount** (e.g., 1TB+) - for actual work
+
+slx keeps minimal config in `~/.config/slx/` (a few KB) while storing projects in a configurable WORKDIR on your larger mount.
 
 ## License
 
@@ -263,15 +253,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Contributing
 
 Contributions are welcome! Feel free to submit issues or pull requests.
-
-## Notes
-
-- The script automatically searches for log files in common locations:
-  - `slurm/logs/jupyter/` (subdirectory structure)
-  - `slurm/logs/` (flat structure)
-  - Current directory (SLURM default)
-
-- All commands use your current user by default. Use `--user` flag to query other users' jobs (if permitted).
-
-- The `killall` command requires confirmation before cancelling all jobs.
-

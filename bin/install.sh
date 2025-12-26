@@ -1,8 +1,12 @@
 #!/bin/bash
-# Installation script for SLURM Cluster Management Tools
-# Supports bash, zsh, csh, and tcsh
+# slx (SLurm eXtended) Installation Script
+# Installs slx to ~/.local with config in ~/.config/slx
 
 set -e
+
+# Tool info
+SLX_NAME="slx"
+SLX_VERSION="1.0.0"
 
 # Colors for output
 RED='\033[0;31m'
@@ -10,14 +14,30 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
+BOLD='\033[1m'
 NC='\033[0m' # No Color
 
-# Get the directory where this script is located (parent of bin/)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Get the directory where this script is located (repo root is parent of bin/)
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# XDG directories (with fallbacks)
+XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+LOCAL_BIN="$HOME/.local/bin"
+
+# slx installation paths
+SLX_CONFIG_DIR="${XDG_CONFIG_HOME}/${SLX_NAME}"
+SLX_DATA_DIR="${XDG_DATA_HOME}/${SLX_NAME}"
+SLX_BIN="${LOCAL_BIN}/${SLX_NAME}"
 
 echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE}SLURM Cluster Management Tools Setup${NC}"
+echo -e "${BLUE}${BOLD}slx${NC}${BLUE} - SLurm eXtended Installer${NC}"
 echo -e "${BLUE}========================================${NC}"
+echo ""
+echo -e "This will install ${BOLD}slx${NC} v${SLX_VERSION} to:"
+echo -e "  Executable: ${CYAN}${SLX_BIN}${NC}"
+echo -e "  Data:       ${CYAN}${SLX_DATA_DIR}${NC}"
+echo -e "  Config:     ${CYAN}${SLX_CONFIG_DIR}${NC}"
 echo ""
 
 # Detect current shell
@@ -27,23 +47,21 @@ detect_shell() {
     elif [ -n "$BASH_VERSION" ]; then
         echo "bash"
     elif [ -n "$tcsh" ] || [ -n "$csh" ]; then
-        # Check if it's tcsh or csh
         if [ -n "$tcsh" ] || echo "$SHELL" | grep -q "tcsh"; then
             echo "tcsh"
         else
             echo "csh"
         fi
     elif [ -n "$SHELL" ]; then
-        # Parse from SHELL variable
         case "$SHELL" in
             *zsh*) echo "zsh" ;;
             *bash*) echo "bash" ;;
             *tcsh*) echo "tcsh" ;;
             *csh*) echo "csh" ;;
-            *) echo "bash" ;; # Default to bash
+            *) echo "bash" ;;
         esac
     else
-        echo "bash" # Default fallback
+        echo "bash"
     fi
 }
 
@@ -68,75 +86,203 @@ get_input() {
     fi
 }
 
+# Check for command conflicts
+check_alias_conflicts() {
+    local conflicts=""
+    
+    for alias in c cs cl cls cr cpd ck cka ct ci cst ch cf ccl; do
+        if command -v "$alias" &> /dev/null; then
+            local cmd_path=$(command -v "$alias")
+            # Skip if it's our own alias
+            if [[ "$cmd_path" != *"slx"* ]]; then
+                conflicts+="  $alias -> $cmd_path\n"
+            fi
+        fi
+    done
+    
+    if [ -n "$conflicts" ]; then
+        echo -e "${YELLOW}Warning: Some aliases may conflict with existing commands:${NC}"
+        echo -e "$conflicts"
+        return 1
+    fi
+    return 0
+}
+
+# Confirm installation
+echo -ne "${YELLOW}Continue with installation? [Y/n]${NC}: "
+read -r confirm
+if [ "$confirm" = "n" ] || [ "$confirm" = "N" ]; then
+    echo "Installation cancelled"
+    exit 0
+fi
+
+echo ""
+
 # Detect shell
 DETECTED_SHELL=$(detect_shell)
 echo -e "${GREEN}Detected shell: ${DETECTED_SHELL}${NC}"
-echo ""
 
-# Ask for shell type
 get_input "Which shell do you want to configure?" "$DETECTED_SHELL" "SHELL_TYPE"
 
 # Validate shell type
 case "$SHELL_TYPE" in
     bash|zsh|csh|tcsh)
-        echo -e "${GREEN}Using shell: $SHELL_TYPE${NC}"
         ;;
     *)
-        echo -e "${RED}Invalid shell type: $SHELL_TYPE${NC}"
-        echo -e "${YELLOW}Defaulting to: $DETECTED_SHELL${NC}"
+        echo -e "${YELLOW}Unknown shell type, defaulting to: $DETECTED_SHELL${NC}"
         SHELL_TYPE="$DETECTED_SHELL"
         ;;
 esac
 
 echo ""
 
-# Get HOME directory
-DEFAULT_HOME="$HOME"
-get_input "Enter your HOME directory" "$DEFAULT_HOME" "USER_HOME"
+# Create directories
+echo -e "${BLUE}Creating directories...${NC}"
+mkdir -p "$LOCAL_BIN"
+mkdir -p "$SLX_DATA_DIR"
+mkdir -p "$SLX_CONFIG_DIR"
 
-# Expand ~ and variables
-USER_HOME=$(eval echo "$USER_HOME")
+# Copy payload to ~/.local/share/slx/
+echo -e "${BLUE}Installing slx to ${SLX_DATA_DIR}...${NC}"
 
-# Validate HOME directory
-if [ ! -d "$USER_HOME" ]; then
-    echo -e "${RED}Error: Directory '$USER_HOME' does not exist${NC}"
-    exit 1
+# Clean previous installation
+if [ -d "$SLX_DATA_DIR" ]; then
+    rm -rf "$SLX_DATA_DIR"/*
+fi
+
+# Copy files (exclude .git, projects/, slurm/, and user files)
+rsync -a --exclude='.git' \
+         --exclude='projects/' \
+         --exclude='slurm/' \
+         --exclude='*.pyc' \
+         --exclude='__pycache__' \
+         "$REPO_DIR/" "$SLX_DATA_DIR/" 2>/dev/null || {
+    # Fallback if rsync is not available
+    cp -r "$REPO_DIR"/* "$SLX_DATA_DIR/" 2>/dev/null || true
+    rm -rf "$SLX_DATA_DIR/.git" 2>/dev/null || true
+    rm -rf "$SLX_DATA_DIR/projects" 2>/dev/null || true
+    rm -rf "$SLX_DATA_DIR/slurm" 2>/dev/null || true
+}
+
+# Make scripts executable
+chmod +x "$SLX_DATA_DIR/bin/slx"
+chmod +x "$SLX_DATA_DIR/bin/install.sh" 2>/dev/null || true
+
+# Create wrapper script in ~/.local/bin/slx
+echo -e "${BLUE}Creating slx command...${NC}"
+cat > "$SLX_BIN" << 'EOF'
+#!/bin/bash
+# slx wrapper - executes the installed slx
+exec "$HOME/.local/share/slx/bin/slx" "$@"
+EOF
+chmod +x "$SLX_BIN"
+
+echo -e "${GREEN}slx command installed to: ${SLX_BIN}${NC}"
+
+# Check if ~/.local/bin is in PATH
+PATH_CONFIGURED=false
+if echo "$PATH" | grep -q "$LOCAL_BIN"; then
+    PATH_CONFIGURED=true
+    echo -e "${GREEN}~/.local/bin is already in PATH${NC}"
+else
+    echo -e "${YELLOW}~/.local/bin is not in your PATH${NC}"
 fi
 
 echo ""
 
-# Get WORKDIR
-DEFAULT_WORKDIR="$SCRIPT_DIR"
-get_input "Enter the cluster tools workdir" "$DEFAULT_WORKDIR" "WORKDIR"
+# Ask about aliases
+echo -e "${CYAN}Would you like to set up short aliases?${NC}"
+echo "  (c, cs, cl, cls, cr, cpd, ck, cka, ct, ci, cst, ch, cf, ccl)"
+echo -ne "${YELLOW}Install aliases? [Y/n]${NC}: "
+read -r install_aliases
 
-# Expand ~ and variables
-WORKDIR=$(eval echo "$WORKDIR")
-
-# Validate WORKDIR
-if [ ! -d "$WORKDIR" ]; then
-    echo -e "${RED}Error: Directory '$WORKDIR' does not exist${NC}"
-    exit 1
+INSTALL_ALIASES=true
+if [ "$install_aliases" = "n" ] || [ "$install_aliases" = "N" ]; then
+    INSTALL_ALIASES=false
 fi
 
-# Check if cluster.sh exists
-if [ ! -f "$WORKDIR/bin/cluster.sh" ]; then
-    echo -e "${RED}Error: cluster.sh not found in '$WORKDIR/bin'${NC}"
-    exit 1
+# Check for conflicts if installing aliases
+if [ "$INSTALL_ALIASES" = true ]; then
+    if ! check_alias_conflicts; then
+        echo -ne "${YELLOW}Continue anyway? [y/N]${NC}: "
+        read -r continue_aliases
+        if [ "$continue_aliases" != "y" ] && [ "$continue_aliases" != "Y" ]; then
+            INSTALL_ALIASES=false
+            echo -e "${YELLOW}Aliases will not be installed${NC}"
+        fi
+    fi
+fi
+
+# Create aliases file
+if [ "$INSTALL_ALIASES" = true ]; then
+    echo -e "${BLUE}Creating aliases...${NC}"
+    
+    if [ "$SHELL_TYPE" = "tcsh" ] || [ "$SHELL_TYPE" = "csh" ]; then
+        # tcsh/csh aliases
+        cat > "$SLX_CONFIG_DIR/aliases.tcsh" << 'EOF'
+# slx aliases for tcsh/csh
+# Source this file in your .tcshrc or .cshrc
+
+alias slx '$HOME/.local/bin/slx'
+alias c 'slx'
+alias cs 'slx submit'
+alias cl 'slx logs'
+alias cls 'slx list'
+alias cr 'slx running'
+alias cpd 'slx pending'
+alias ck 'slx kill'
+alias cka 'slx killall'
+alias ct 'slx tail'
+alias ci 'slx info'
+alias cst 'slx status'
+alias ch 'slx history'
+alias cf 'slx find'
+alias ccl 'slx clean'
+alias cp 'slx project'
+alias cpn 'slx project new'
+alias cps 'slx project submit'
+alias cpl 'slx project list'
+EOF
+        echo -e "${GREEN}Aliases saved to: ${SLX_CONFIG_DIR}/aliases.tcsh${NC}"
+    else
+        # bash/zsh aliases
+        cat > "$SLX_CONFIG_DIR/aliases.sh" << 'EOF'
+# slx aliases for bash/zsh
+# Source this file in your .bashrc or .zshrc
+
+alias slx='$HOME/.local/bin/slx'
+alias c='slx'
+alias cs='slx submit'
+alias cl='slx logs'
+alias cls='slx list'
+alias cr='slx running'
+alias cpd='slx pending'
+alias ck='slx kill'
+alias cka='slx killall'
+alias ct='slx tail'
+alias ci='slx info'
+alias cst='slx status'
+alias ch='slx history'
+alias cf='slx find'
+alias ccl='slx clean'
+alias cp='slx project'
+alias cpn='slx project new'
+alias cps='slx project submit'
+alias cpl='slx project list'
+EOF
+        echo -e "${GREEN}Aliases saved to: ${SLX_CONFIG_DIR}/aliases.sh${NC}"
+    fi
 fi
 
 echo ""
-echo -e "${BLUE}Configuration Summary:${NC}"
-echo -e "  Shell: ${GREEN}$SHELL_TYPE${NC}"
-echo -e "  HOME: ${GREEN}$USER_HOME${NC}"
-echo -e "  WORKDIR: ${GREEN}$WORKDIR${NC}"
-echo ""
 
-# Confirm
-echo -ne "${YELLOW}Proceed with installation? [y/N]${NC}: "
-read -r confirm
-if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
-    echo -e "${YELLOW}Installation cancelled${NC}"
-    exit 0
+# Ask about completion
+echo -ne "${CYAN}Enable tab completion? [Y/n]${NC}: "
+read -r enable_completion
+
+ENABLE_COMPLETION=true
+if [ "$enable_completion" = "n" ] || [ "$enable_completion" = "N" ]; then
+    ENABLE_COMPLETION=false
 fi
 
 echo ""
@@ -144,114 +290,164 @@ echo ""
 # Determine shell config file
 case "$SHELL_TYPE" in
     bash)
-        SHELL_CONFIG="$USER_HOME/.bashrc"
-        ALIAS_FILE="$WORKDIR/cluster_aliases.sh"
+        SHELL_CONFIG="$HOME/.bashrc"
+        ALIAS_FILE="$SLX_CONFIG_DIR/aliases.sh"
+        COMPLETION_FILE="$SLX_DATA_DIR/completions/slx.bash"
         ;;
     zsh)
-        SHELL_CONFIG="$USER_HOME/.zshrc"
-        ALIAS_FILE="$WORKDIR/cluster_aliases.sh"
+        SHELL_CONFIG="$HOME/.zshrc"
+        ALIAS_FILE="$SLX_CONFIG_DIR/aliases.sh"
+        COMPLETION_FILE="$SLX_DATA_DIR/completions/slx.zsh"
         ;;
     tcsh)
-        SHELL_CONFIG="$USER_HOME/.tcshrc"
-        ALIAS_FILE="$WORKDIR/cluster_aliases.tcsh"
+        SHELL_CONFIG="$HOME/.tcshrc"
+        ALIAS_FILE="$SLX_CONFIG_DIR/aliases.tcsh"
+        COMPLETION_FILE=""  # No completion for tcsh
         ;;
     csh)
-        SHELL_CONFIG="$USER_HOME/.cshrc"
-        ALIAS_FILE="$WORKDIR/cluster_aliases.tcsh"
+        SHELL_CONFIG="$HOME/.cshrc"
+        ALIAS_FILE="$SLX_CONFIG_DIR/aliases.tcsh"
+        COMPLETION_FILE=""  # No completion for csh
         ;;
 esac
 
-# Check if alias file exists
-if [ ! -f "$ALIAS_FILE" ]; then
-    echo -e "${RED}Error: Alias file '$ALIAS_FILE' not found${NC}"
-    exit 1
-fi
-
 # Create shell config if it doesn't exist
 if [ ! -f "$SHELL_CONFIG" ]; then
-    echo -e "${YELLOW}Creating $SHELL_CONFIG${NC}"
     touch "$SHELL_CONFIG"
 fi
 
+# Build the configuration block
+echo -e "${BLUE}Configuring shell...${NC}"
+
+CONFIG_MARKER="# slx (SLurm eXtended)"
+
 # Check if already configured
-CONFIG_MARKER="# SLURM Cluster Management Tools"
 if grep -q "$CONFIG_MARKER" "$SHELL_CONFIG" 2>/dev/null; then
-    echo -e "${YELLOW}Configuration already exists in $SHELL_CONFIG${NC}"
-    echo -ne "${YELLOW}Update existing configuration? [y/N]${NC}: "
-    read -r update
-    if [ "$update" != "y" ] && [ "$update" != "Y" ]; then
-        echo -e "${YELLOW}Skipping configuration update${NC}"
-    else
+    echo -e "${YELLOW}slx configuration already exists in $SHELL_CONFIG${NC}"
+    echo -ne "${YELLOW}Update existing configuration? [Y/n]${NC}: "
+    read -r update_config
+    
+    if [ "$update_config" != "n" ] && [ "$update_config" != "N" ]; then
         # Remove old configuration
         if [ "$SHELL_TYPE" = "tcsh" ] || [ "$SHELL_TYPE" = "csh" ]; then
-            sed -i '/# SLURM Cluster Management Tools/,/^fi$/d' "$SHELL_CONFIG" 2>/dev/null || \
-            sed -i '/# SLURM Cluster Management Tools/,/^endif$/d' "$SHELL_CONFIG" 2>/dev/null || true
+            sed -i '/# slx (SLurm eXtended)/,/^endif/d' "$SHELL_CONFIG" 2>/dev/null || \
+            sed -i '' '/# slx (SLurm eXtended)/,/^endif/d' "$SHELL_CONFIG" 2>/dev/null || true
         else
-            sed -i '/# SLURM Cluster Management Tools/,/^fi$/d' "$SHELL_CONFIG" 2>/dev/null || true
+            sed -i '/# slx (SLurm eXtended)/,/^fi$/d' "$SHELL_CONFIG" 2>/dev/null || \
+            sed -i '' '/# slx (SLurm eXtended)/,/^fi$/d' "$SHELL_CONFIG" 2>/dev/null || true
         fi
         echo -e "${GREEN}Removed old configuration${NC}"
+    else
+        echo -e "${YELLOW}Keeping existing configuration${NC}"
     fi
 fi
 
-# Add configuration
-if ! grep -q "$CONFIG_MARKER" "$SHELL_CONFIG" 2>/dev/null || [ "$update" = "y" ] || [ "$update" = "Y" ]; then
-    echo -e "${GREEN}Adding configuration to $SHELL_CONFIG${NC}"
-    
-    # Create backup
+# Add new configuration if not present
+if ! grep -q "$CONFIG_MARKER" "$SHELL_CONFIG" 2>/dev/null; then
+    # Backup
     cp "$SHELL_CONFIG" "$SHELL_CONFIG.backup.$(date +%Y%m%d_%H%M%S)" 2>/dev/null || true
     
-    # Add configuration based on shell type
     if [ "$SHELL_TYPE" = "tcsh" ] || [ "$SHELL_TYPE" = "csh" ]; then
+        # tcsh/csh configuration
         cat >> "$SHELL_CONFIG" << EOF
 
-# SLURM Cluster Management Tools
-setenv CLUSTER_WORKDIR $WORKDIR
-if ( -f \$CLUSTER_WORKDIR/cluster_aliases.tcsh ) then
-    source \$CLUSTER_WORKDIR/cluster_aliases.tcsh
+# slx (SLurm eXtended)
+if ( -d \$HOME/.local/bin ) then
+    setenv PATH \$HOME/.local/bin:\$PATH
 endif
 EOF
+        if [ "$INSTALL_ALIASES" = true ]; then
+            cat >> "$SHELL_CONFIG" << EOF
+if ( -f $ALIAS_FILE ) then
+    source $ALIAS_FILE
+endif
+EOF
+        fi
+        echo "endif" >> "$SHELL_CONFIG"  # Close the slx block marker for cleanup
+        
     else
-        # bash/zsh
+        # bash/zsh configuration
         cat >> "$SHELL_CONFIG" << EOF
 
-# SLURM Cluster Management Tools
-export CLUSTER_WORKDIR="$WORKDIR"
-if [ -f "\$CLUSTER_WORKDIR/cluster_aliases.sh" ]; then
-    source "\$CLUSTER_WORKDIR/cluster_aliases.sh"
+# slx (SLurm eXtended)
+if [ -d "\$HOME/.local/bin" ]; then
+    export PATH="\$HOME/.local/bin:\$PATH"
 fi
 EOF
+        if [ "$INSTALL_ALIASES" = true ]; then
+            cat >> "$SHELL_CONFIG" << EOF
+if [ -f "$ALIAS_FILE" ]; then
+    source "$ALIAS_FILE"
+fi
+EOF
+        fi
+        if [ "$ENABLE_COMPLETION" = true ] && [ -n "$COMPLETION_FILE" ]; then
+            cat >> "$SHELL_CONFIG" << EOF
+if [ -f "$COMPLETION_FILE" ]; then
+    source "$COMPLETION_FILE"
+fi
+EOF
+        fi
     fi
     
-    echo -e "${GREEN}Configuration added successfully!${NC}"
-else
-    echo -e "${YELLOW}Configuration already exists, skipping${NC}"
+    echo -e "${GREEN}Configuration added to: $SHELL_CONFIG${NC}"
+fi
+
+# Create initial config.env if it doesn't exist
+if [ ! -f "$SLX_CONFIG_DIR/config.env" ]; then
+    cat > "$SLX_CONFIG_DIR/config.env" << EOF
+# slx configuration file
+# Run 'slx init' to update these settings interactively
+
+# WORKDIR: Base directory for projects
+SLX_WORKDIR="$HOME/workdir"
+
+# Default SLURM job settings (empty = use cluster defaults)
+SLX_PARTITION=""
+SLX_ACCOUNT=""
+SLX_QOS=""
+SLX_TIME="1440"
+SLX_NODES="1"
+SLX_NTASKS="1"
+SLX_CPUS="4"
+SLX_MEM="50000"
+SLX_GPUS=""
+SLX_EXCLUDE=""
+
+# Log directory
+SLX_LOG_DIR="\${SLX_WORKDIR}/slurm/logs"
+EOF
+    echo -e "${GREEN}Initial config created: $SLX_CONFIG_DIR/config.env${NC}"
 fi
 
 echo ""
 echo -e "${BLUE}========================================${NC}"
-echo -e "${GREEN}Installation Complete!${NC}"
+echo -e "${GREEN}${BOLD}Installation Complete!${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
-echo -e "The cluster management tools have been configured for ${GREEN}$SHELL_TYPE${NC}."
+echo -e "slx has been installed successfully."
 echo ""
-echo -e "${YELLOW}To use the tools:${NC}"
+echo -e "${YELLOW}To start using slx:${NC}"
 echo -e "  1. Start a new shell session, or"
 echo -e "  2. Run: ${CYAN}source $SHELL_CONFIG${NC}"
 echo ""
-echo -e "${YELLOW}Available aliases:${NC}"
-echo -e "  ${CYAN}cs${NC}  - Submit a job"
-echo -e "  ${CYAN}cl${NC}  - View job logs"
-echo -e "  ${CYAN}cls${NC} - List jobs"
-echo -e "  ${CYAN}cr${NC}  - List running jobs"
-echo -e "  ${CYAN}cpd${NC} - List pending jobs"
-echo -e "  ${CYAN}ck${NC}  - Kill a job"
-echo -e "  ${CYAN}ct${NC}  - Tail logs"
-echo -e "  ${CYAN}ci${NC}  - Show job info"
-echo -e "  ${CYAN}cst${NC} - Show status"
-echo -e "  ${CYAN}ch${NC}  - Show history"
-echo -e "  ${CYAN}cf${NC}  - Find jobs"
-echo -e "  ${CYAN}ccl${NC} - Clean logs"
-echo ""
-echo -e "For more information, see: ${CYAN}$WORKDIR/README.md${NC}"
+echo -e "${YELLOW}Quick start:${NC}"
+echo -e "  ${CYAN}slx init${NC}           # Configure slx for your cluster"
+echo -e "  ${CYAN}slx project new${NC}    # Create a new project"
+echo -e "  ${CYAN}slx project submit${NC} # Submit a project job"
+echo -e "  ${CYAN}slx list${NC}           # List your jobs"
 echo ""
 
+if [ "$INSTALL_ALIASES" = true ]; then
+    echo -e "${YELLOW}Available aliases:${NC}"
+    echo -e "  ${CYAN}c${NC}   - slx (base command)"
+    echo -e "  ${CYAN}cs${NC}  - slx submit"
+    echo -e "  ${CYAN}cl${NC}  - slx logs"
+    echo -e "  ${CYAN}cls${NC} - slx list"
+    echo -e "  ${CYAN}cpn${NC} - slx project new"
+    echo -e "  ${CYAN}cps${NC} - slx project submit"
+    echo ""
+fi
+
+echo -e "For more information: ${CYAN}slx help${NC}"
+echo ""
