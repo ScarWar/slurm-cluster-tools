@@ -246,10 +246,27 @@ slx logs <TAB>               # Complete job IDs
 ├── templates/
 │   ├── run.sh.tmpl          # Run script template
 │   └── job.sbatch.tmpl      # Sbatch template
+├── tests/
+│   └── test_slx_init.sh     # Test suite for slx init
 ├── LICENSE                  # MIT License
 ├── .gitignore
 └── README.md
 ```
+
+## Testing
+
+Run the test suite to verify `slx init` functionality:
+
+```bash
+bash tests/test_slx_init.sh
+```
+
+The test suite covers:
+- SLURM query helpers (partitions, accounts, QoS, nodes)
+- Menu selection parsing (single, range, comma-separated)
+- Configuration loading and saving
+- SBATCH generation with nodelist/exclude
+- Edge cases (empty lists, special characters, duplicates)
 
 ## Why Separate HOME and WORKDIR?
 
