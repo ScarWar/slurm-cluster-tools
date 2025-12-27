@@ -5,12 +5,28 @@ A production-ready SLURM project manager for HPC clusters. Manage jobs, create p
 ## Features
 
 - **Project Management** - Create and manage SLURM projects with generated sbatch/run scripts
+- **Git Integration** - Optionally initialize a git repository for your project code
 - **Job Operations** - Submit, list, kill, and monitor SLURM jobs
 - **Cluster-Aware Setup** - Queries SLURM for available partitions, accounts, QoS, and nodes
 - **Interactive Menus** - Multi-select UI with `whiptail`/`dialog` (falls back to text)
 - **Tab Completion** - Full bash/zsh completion support
 - **Short Aliases** - Optional quick aliases (`cs`, `cl`, `ck`, etc.)
 - **Cluster-Friendly** - Separates config (HOME) from data (WORKDIR) for limited quotas
+
+## Quick Start
+
+```bash
+# Install
+git clone git@github.com:ScarWar/slx.git
+cd slx && ./bin/install.sh
+
+# Setup (run once per cluster)
+slx init
+
+# Create and run a project
+slx project new --git
+slx project submit my-project
+```
 
 ## Installation
 
@@ -36,47 +52,13 @@ The installer will:
 
 ### Updating slx
 
-To update to a newer version:
-
 ```bash
 cd slx
 git pull
 ./bin/update.sh
 ```
 
-The update script will:
-- Preserve your configuration (`~/.config/slx/config.env`)
-- Preserve your aliases
-- Preserve your projects and job data
-- Update the slx files to the latest version
-- Create a backup of your config before updating
-
-**Note:** You can also rerun `./bin/install.sh` to update, but it will ask interactive questions. The `update.sh` script is non-interactive and faster.
-
-## Install Layout
-
-```
-~/.local/
-├── bin/
-│   └── slx                    # Main command (wrapper)
-└── share/
-    └── slx/                   # Tool payload
-        ├── bin/slx            # Main CLI script
-        ├── completions/       # Tab completion scripts
-        └── templates/         # Project templates
-
-~/.config/
-└── slx/
-    ├── config.env             # User configuration
-    └── aliases.sh             # Shell aliases (if enabled)
-
-$WORKDIR/
-└── projects/
-    └── my-project/            # Your projects
-        ├── run.sh             # Main script
-        ├── run.sbatch         # SLURM job file
-        └── logs/              # Job output logs
-```
+The update script preserves your configuration, aliases, projects, and job data.
 
 ## Usage
 
@@ -102,11 +84,14 @@ If `whiptail` or `dialog` is installed, you get a nice TUI menu. Otherwise, a te
 ### Project Commands
 
 ```bash
-# Create a new project
+# Create a new project (interactive)
 slx project new
 
-# Create a new project with git repository
+# Create with git repository
 slx project new --git
+
+# Skip git (non-interactive)
+slx project new --no-git
 
 # List all projects
 slx project list
@@ -114,6 +99,22 @@ slx project list
 # Submit a project job
 slx project submit my-project
 ```
+
+#### Project Options
+
+| Option | Description |
+|--------|-------------|
+| `--git` | Initialize a git repository with README.md and .gitignore |
+| `--no-git` | Skip git initialization (no prompt) |
+
+When creating a project, you'll be prompted for:
+- **Project name** (required)
+- **Run script name** (default: `run`)
+- **Sbatch file name** (default: same as run script)
+- **SLURM job name** (default: project name)
+- **Job settings** (optional customization)
+- **Git repository** (if not specified via flag)
+- **Git repo directory name** (if git enabled, defaults to project name)
 
 ### Job Commands
 
@@ -146,6 +147,68 @@ slx find jupyter
 # Cleanup old logs
 slx clean
 ```
+
+## Project Structure
+
+### Basic Project
+
+When you run `slx project new`, it creates:
+
+```
+$WORKDIR/projects/my-project/
+├── run.sh           # Your main script (edit this!)
+├── run.sbatch       # SLURM job file (auto-generated)
+└── logs/            # Job output logs
+    ├── my-project_123456.out
+    └── my-project_123456.err
+```
+
+### Project with Git (`--git`)
+
+With `slx project new --git`, it creates a git repository subdirectory for your code:
+
+```
+$WORKDIR/projects/my-project/
+├── run.sh           # SLURM run script (edit to call your code)
+├── run.sbatch       # SLURM job file (auto-generated)
+├── logs/            # Job output logs
+└── my-project/      # Git repository (your code goes here)
+    ├── .git/
+    ├── .gitignore
+    └── README.md
+```
+
+**Why this structure?**
+- SLURM scripts (`run.sh`, `run.sbatch`) stay outside the git repo
+- Your code lives in a clean git repository
+- Logs are separate and won't clutter your repo
+- The git repo name is customizable during creation
+
+### run.sh
+
+This is your main script. Edit it to run your code:
+
+```bash
+#!/bin/bash
+echo "Starting my-project..."
+
+# Activate environment
+source /path/to/venv/bin/activate
+
+# Run your code (from the git repo)
+cd my-project
+python train.py --gpus=${SLURM_GPUS}
+
+echo "Job completed!"
+```
+
+### run.sbatch
+
+The sbatch file is auto-generated with your settings. It:
+- Sets SLURM job parameters (partition, account, time, resources, etc.)
+- Changes to the project directory
+- Runs `run.sh`
+- Saves logs to `logs/`
 
 ## Aliases
 
@@ -195,59 +258,6 @@ SLX_EXCLUDE="node-01,node-02" # Excluded nodes (--exclude)
 
 Run `slx init` to update these settings interactively with cluster-aware menus.
 
-## Project Structure
-
-When you run `slx project new`, it creates:
-
-```
-$WORKDIR/projects/my-project/
-├── run.sh           # Your main script (edit this!)
-├── run.sbatch       # SLURM job file (auto-generated)
-└── logs/            # Job output logs
-    ├── my-project_123456.out
-    └── my-project_123456.err
-```
-
-With `--git`, it also creates a git repository subdirectory for your code:
-
-```
-$WORKDIR/projects/my-project/
-├── run.sh           # SLURM run script
-├── run.sbatch       # SLURM job file
-├── logs/            # Job output logs
-└── my-project/      # Git repository (your code goes here)
-    ├── .git/
-    ├── .gitignore
-    └── README.md
-```
-
-The git repo directory name defaults to the project name but can be customized during creation.
-
-### run.sh
-
-This is your main script. Edit it to run your code:
-
-```bash
-#!/bin/bash
-echo "Starting my-project..."
-
-# Activate environment
-source /path/to/venv/bin/activate
-
-# Run your code
-python train.py --gpus=${SLURM_GPUS}
-
-echo "Job completed!"
-```
-
-### run.sbatch
-
-The sbatch file is auto-generated with your settings. It:
-- Sets SLURM job parameters
-- Changes to the project directory
-- Runs `run.sh`
-- Saves logs to `logs/`
-
 ## Tab Completion
 
 Tab completion is available for bash and zsh:
@@ -259,6 +269,31 @@ slx project submit <TAB>     # Complete project names
 slx logs <TAB>               # Complete job IDs
 ```
 
+## Install Layout
+
+```
+~/.local/
+├── bin/
+│   └── slx                    # Main command (wrapper)
+└── share/
+    └── slx/                   # Tool payload
+        ├── bin/slx            # Main CLI script
+        ├── lib/slx/           # Library modules
+        │   ├── common.sh      # Shared functions
+        │   └── commands/      # Command implementations
+        ├── completions/       # Tab completion scripts
+        └── templates/         # Project templates
+
+~/.config/
+└── slx/
+    ├── config.env             # User configuration
+    └── aliases.sh             # Shell aliases (if enabled)
+
+$WORKDIR/
+└── projects/
+    └── my-project/            # Your projects
+```
+
 ## Requirements
 
 - SLURM workload manager
@@ -268,45 +303,7 @@ slx logs <TAB>               # Complete job IDs
 ### Optional
 
 - **whiptail** or **dialog** - For interactive TUI menus during `slx init` and `slx project new`. If not installed, falls back to text-based selection.
-
-## File Structure (Repository)
-
-```
-.
-├── bin/
-│   ├── slx                  # Main CLI
-│   ├── cluster.sh           # Deprecated wrapper
-│   ├── install.sh           # Installation script
-│   └── update.sh            # Update script
-├── completions/
-│   ├── slx.bash             # Bash completion
-│   └── slx.zsh              # Zsh completion
-├── templates/
-│   ├── run.sh.tmpl          # Run script template
-│   ├── job.sbatch.tmpl      # Sbatch template
-│   ├── gitignore.tmpl       # Project .gitignore template
-│   └── readme.md.tmpl       # Project README template
-├── tests/
-│   └── test_slx_init.sh     # Test suite for slx init
-├── LICENSE                  # MIT License
-├── .gitignore
-└── README.md
-```
-
-## Testing
-
-Run the test suite to verify `slx init` functionality:
-
-```bash
-bash tests/test_slx_init.sh
-```
-
-The test suite covers:
-- SLURM query helpers (partitions, accounts, QoS, nodes)
-- Menu selection parsing (single, range, comma-separated)
-- Configuration loading and saving
-- SBATCH generation with nodelist/exclude
-- Edge cases (empty lists, special characters, duplicates)
+- **git** - For `slx project new --git` to initialize repositories
 
 ## Why Separate HOME and WORKDIR?
 
@@ -315,6 +312,36 @@ Many HPC clusters have:
 - **Large scratch/data mount** (e.g., 1TB+) - for actual work
 
 slx keeps minimal config in `~/.config/slx/` (a few KB) while storing projects in a configurable WORKDIR on your larger mount.
+
+## Repository Structure
+
+```
+.
+├── bin/
+│   ├── slx                  # Main CLI entry point
+│   ├── install.sh           # Installation script
+│   └── update.sh            # Update script
+├── lib/
+│   └── slx/
+│       ├── common.sh        # Shared functions
+│       └── commands/        # Command implementations
+│           ├── project.sh   # Project commands
+│           ├── submit.sh    # Job submission
+│           ├── logs.sh      # Log viewing
+│           └── ...
+├── completions/
+│   ├── slx.bash             # Bash completion
+│   └── slx.zsh              # Zsh completion
+├── templates/
+│   ├── job.sbatch.tmpl      # Sbatch template
+│   ├── run.sh.tmpl          # Run script template
+│   ├── gitignore.tmpl       # Project .gitignore
+│   └── readme.md.tmpl       # Project README
+├── tests/
+│   └── test_slx_init.sh     # Test suite
+├── LICENSE
+└── README.md
+```
 
 ## License
 
