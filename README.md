@@ -10,7 +10,7 @@ A production-ready SLURM project manager for HPC clusters. Manage jobs, create p
 - **Cluster-Aware Setup** - Queries SLURM for available partitions, accounts, QoS, and nodes
 - **Interactive Menus** - Multi-select UI with `whiptail`/`dialog` (falls back to text)
 - **Tab Completion** - Full bash/zsh completion support
-- **Short Aliases** - Optional quick aliases (`cs`, `cl`, `ck`, etc.)
+- **Short Aliases** - Optional quick aliases (`sx`, `sxs`, `sxl`, `sxk`, etc.)
 - **Cluster-Friendly** - Separates config (HOME) from data (WORKDIR) for limited quotas
 
 ## Quick Start
@@ -39,6 +39,7 @@ cd slx
 ```
 
 The installer will:
+
 - Copy slx to `~/.local/share/slx/`
 - Create the `slx` command in `~/.local/bin/`
 - Set up configuration in `~/.config/slx/`
@@ -71,6 +72,7 @@ slx init
 ```
 
 This queries your cluster and presents interactive menus:
+
 - **WORKDIR**: Where to store projects (auto-detects `/scratch`, `/data`, etc.)
 - **Partition**: Choose from available partitions (queried via `sinfo`)
 - **Account**: Choose from your accounts (queried via `sacctmgr`)
@@ -102,12 +104,13 @@ slx project submit my-project
 
 #### Project Options
 
-| Option | Description |
-|--------|-------------|
-| `--git` | Initialize a git repository with README.md and .gitignore |
-| `--no-git` | Skip git initialization (no prompt) |
+| Option        | Description                                               |
+|--------       |-------------                                              |
+| `--git`       | Initialize a git repository with README.md and .gitignore |
+| `--no-git`    | Skip git initialization (no prompt)                       |
 
 When creating a project, you'll be prompted for:
+
 - **Project name** (required)
 - **Run script name** (default: `run`)
 - **Sbatch file name** (default: same as run script)
@@ -154,7 +157,7 @@ slx clean
 
 When you run `slx project new`, it creates:
 
-```
+```shell
 $WORKDIR/projects/my-project/
 ├── run.sh           # Your main script (edit this!)
 ├── run.sbatch       # SLURM job file (auto-generated)
@@ -167,7 +170,7 @@ $WORKDIR/projects/my-project/
 
 With `slx project new --git`, it creates a git repository subdirectory for your code:
 
-```
+```shell
 $WORKDIR/projects/my-project/
 ├── run.sh           # SLURM run script (edit to call your code)
 ├── run.sbatch       # SLURM job file (auto-generated)
@@ -179,6 +182,7 @@ $WORKDIR/projects/my-project/
 ```
 
 **Why this structure?**
+
 - SLURM scripts (`run.sh`, `run.sbatch`) stay outside the git repo
 - Your code lives in a clean git repository
 - Logs are separate and won't clutter your repo
@@ -205,6 +209,7 @@ echo "Job completed!"
 ### run.sbatch
 
 The sbatch file is auto-generated with your settings. It:
+
 - Sets SLURM job parameters (partition, account, time, resources, etc.)
 - Changes to the project directory
 - Runs `run.sh`
@@ -214,25 +219,27 @@ The sbatch file is auto-generated with your settings. It:
 
 If you enabled aliases during installation, you can use these shortcuts:
 
-| Alias | Command | Description |
-|-------|---------|-------------|
-| `c` | `slx` | Base command |
-| `cs` | `slx submit` | Submit a job |
-| `cl` | `slx logs` | View logs |
-| `cls` | `slx list` | List jobs |
-| `cr` | `slx running` | Running jobs |
-| `cpd` | `slx pending` | Pending jobs |
-| `ck` | `slx kill` | Kill a job |
-| `cka` | `slx killall` | Kill all jobs |
-| `ct` | `slx tail` | Tail logs |
-| `ci` | `slx info` | Job info |
-| `cst` | `slx status` | Status summary |
-| `ch` | `slx history` | Job history |
-| `cf` | `slx find` | Find jobs |
-| `ccl` | `slx clean` | Clean logs |
-| `cpn` | `slx project new` | New project |
-| `cps` | `slx project submit` | Submit project |
-| `cpl` | `slx project list` | List projects |
+| Alias  | Command                | Description       |
+|--------|------------------------|-------------------|
+| `slx`  | `$HOME/.local/bin/slx` | Base command      |
+| `sx`   | `slx`                  | Base command      |
+| `sxs`  | `slx submit`           | Submit a job      |
+| `sxl`  | `slx logs`             | View logs         |
+| `sxls` | `slx list`             | List jobs         |
+| `sxr`  | `slx running`          | Running jobs      |
+| `sxpd` | `slx pending`          | Pending jobs      |
+| `sxk`  | `slx kill`             | Kill a job        |
+| `sxka` | `slx killall`          | Kill all jobs     |
+| `sxt`  | `slx tail`             | Tail logs         |
+| `sxi`  | `slx info`             | Job info          |
+| `sxst` | `slx status`           | Status summary    |
+| `sxh`  | `slx history`          | Job history       |
+| `sxf`  | `slx find`             | Find jobs         |
+| `sxcl` | `slx clean`            | Clean logs        |
+| `sxp`  | `slx project`          | Project command   |
+| `sxpn` | `slx project new`      | New project       |
+| `sxps` | `slx project submit`   | Submit project    |
+| `sxpl` | `slx project list`     | List projects     |
 
 ## Configuration
 
@@ -271,7 +278,7 @@ slx logs <TAB>               # Complete job IDs
 
 ## Install Layout
 
-```
+```shell
 ~/.local/
 ├── bin/
 │   └── slx                    # Main command (wrapper)
@@ -308,6 +315,7 @@ $WORKDIR/
 ## Why Separate HOME and WORKDIR?
 
 Many HPC clusters have:
+
 - **Limited HOME quota** (e.g., 10GB) - for config files
 - **Large scratch/data mount** (e.g., 1TB+) - for actual work
 
@@ -315,7 +323,7 @@ slx keeps minimal config in `~/.config/slx/` (a few KB) while storing projects i
 
 ## Repository Structure
 
-```
+```shell
 .
 ├── bin/
 │   ├── slx                  # Main CLI entry point
