@@ -8,6 +8,11 @@ _slx_completion() {
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
     
+    # Helper function to check if a string is a numeric job ID
+    _is_job_id() {
+        [[ "$1" =~ ^[0-9]+$ ]]
+    }
+    
     # Main commands
     commands="init project submit list running pending kill killall logs tail info status history find clean version help"
     
@@ -41,11 +46,10 @@ _slx_completion() {
                     return 0
                     ;;
                 info)
-                    # Complete with job IDs or --nodes/-n option
+                    # Complete with job IDs only at position 2
                     if command -v squeue &> /dev/null; then
                         local job_ids=$(squeue -u $USER -h -o "%i" 2>/dev/null)
-                        local options="--nodes -n"
-                        COMPREPLY=($(compgen -W "${job_ids} ${options}" -- "${cur}"))
+                        COMPREPLY=($(compgen -W "${job_ids}" -- "${cur}"))
                     fi
                     return 0
                     ;;
@@ -81,6 +85,14 @@ _slx_completion() {
                             return 0
                             ;;
                     esac
+                    ;;
+                info)
+                    # If position 2 was a job ID, show flag options
+                    if _is_job_id "${COMP_WORDS[2]}"; then
+                        local options="--nodes -n"
+                        COMPREPLY=($(compgen -W "${options}" -- "${cur}"))
+                    fi
+                    return 0
                     ;;
                 list)
                     if [ "${prev}" == "--user" ]; then
@@ -123,11 +135,24 @@ _complete_slx_alias() {
                 COMPREPLY=($(compgen -f -X '!*.sbatch' -- "${cur}"))
             fi
             ;;
-        cl|ct|ck|ci)
-            # cl = logs, ct = tail, ck = kill, ci = info
+        cl|ct|ck)
+            # cl = logs, ct = tail, ck = kill
             if [ "${COMP_CWORD}" -eq 1 ] && command -v squeue &> /dev/null; then
                 local job_ids=$(squeue -u $USER -h -o "%i" 2>/dev/null)
                 COMPREPLY=($(compgen -W "${job_ids}" -- "${cur}"))
+            fi
+            ;;
+        ci)
+            # ci = slx info
+            if [ "${COMP_CWORD}" -eq 1 ] && command -v squeue &> /dev/null; then
+                local job_ids=$(squeue -u $USER -h -o "%i" 2>/dev/null)
+                COMPREPLY=($(compgen -W "${job_ids}" -- "${cur}"))
+            elif [ "${COMP_CWORD}" -eq 2 ]; then
+                # If position 1 was a job ID, show flag options
+                if [[ "${COMP_WORDS[1]}" =~ ^[0-9]+$ ]]; then
+                    local options="--nodes -n"
+                    COMPREPLY=($(compgen -W "${options}" -- "${cur}"))
+                fi
             fi
             ;;
         cf)
