@@ -17,8 +17,8 @@ A production-ready SLURM project manager for HPC clusters. Manage jobs, create p
 ### Quick Install
 
 ```bash
-git clone git@github.com:ScarWar/slurm-cluster-tools.git
-cd slurm-cluster-tools
+git clone git@github.com:ScarWar/slx.git
+cd slx
 ./bin/install.sh
 ```
 
@@ -39,7 +39,7 @@ The installer will:
 To update to a newer version:
 
 ```bash
-cd slurm-cluster-tools
+cd slx
 git pull
 ./bin/update.sh
 ```
