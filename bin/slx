@@ -883,9 +883,6 @@ EOF
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
 
-# Change to project directory
-cd "\$(dirname "\$0")"
-
 # Run the main script
 bash ${RUN_NAME}.sh
 EOF
