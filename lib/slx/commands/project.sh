@@ -19,9 +19,13 @@ cmd_project() {
             ;;
         ""|help)
             echo -e "${BOLD}Project commands:${NC}"
-            echo "  slx project new              Create a new project"
-            echo "  slx project submit <name>    Submit a project's job"
-            echo "  slx project list             List all projects"
+            echo "  slx project new [--git|--no-git]   Create a new project"
+            echo "  slx project submit <name>          Submit a project's job"
+            echo "  slx project list                   List all projects"
+            echo ""
+            echo -e "${BOLD}Options for 'new':${NC}"
+            echo "  --git       Initialize a git repository with README.md and .gitignore"
+            echo "  --no-git    Skip git initialization (default if not prompted)"
             ;;
         *)
             echo -e "${RED}Unknown project command: $subcmd${NC}"
@@ -33,6 +37,24 @@ cmd_project() {
 
 # Create a new project
 project_new() {
+    # Parse --git/--no-git flags
+    local INIT_GIT=""
+    local args=()
+    for arg in "$@"; do
+        case "$arg" in
+            --git)
+                INIT_GIT="yes"
+                ;;
+            --no-git)
+                INIT_GIT="no"
+                ;;
+            *)
+                args+=("$arg")
+                ;;
+        esac
+    done
+    set -- "${args[@]}"
+    
     echo -e "${BLUE}========================================${NC}"
     echo -e "${BLUE}Create New Project${NC}"
     echo -e "${BLUE}========================================${NC}"
@@ -132,12 +154,29 @@ project_new() {
             "Select nodes to exclude for this project:"
     fi
     
+    # Prompt for git init if not specified via flags
+    if [ -z "$INIT_GIT" ]; then
+        echo ""
+        echo -ne "${YELLOW}Initialize git repository? [y/N]${NC}: "
+        read -r git_choice
+        if [ "$git_choice" = "y" ] || [ "$git_choice" = "Y" ]; then
+            INIT_GIT="yes"
+        else
+            INIT_GIT="no"
+        fi
+    fi
+    
     echo ""
     echo -e "${BLUE}Project Summary:${NC}"
     echo -e "  Name:      ${GREEN}${PROJECT_NAME}${NC}"
     echo -e "  Directory: ${GREEN}${PROJECT_DIR}${NC}"
     echo -e "  Run:       ${GREEN}${RUN_NAME}.sh${NC}"
     echo -e "  Sbatch:    ${GREEN}${SBATCH_NAME}.sbatch${NC}"
+    if [ "$INIT_GIT" = "yes" ]; then
+        echo -e "  Git:       ${GREEN}yes${NC}"
+    else
+        echo -e "  Git:       ${YELLOW}no${NC}"
+    fi
     echo ""
     
     echo -ne "${YELLOW}Create project? [Y/n]${NC}: "
@@ -211,11 +250,45 @@ EOF
     chmod +x "$RUN_FILE"
     chmod +x "$SBATCH_FILE"
     
+    # Initialize git repository if requested
+    if [ "$INIT_GIT" = "yes" ]; then
+        if has_cmd git; then
+            # Only init if .git doesn't already exist
+            if [ ! -d "$PROJECT_DIR/.git" ]; then
+                git -C "$PROJECT_DIR" init --quiet
+                echo -e "${GREEN}Initialized git repository${NC}"
+            fi
+            
+            # Create .gitignore only if it doesn't exist
+            local GITIGNORE_FILE="${PROJECT_DIR}/.gitignore"
+            if [ ! -f "$GITIGNORE_FILE" ]; then
+                process_template "${TEMPLATE_DIR}/gitignore.tmpl" \
+                    "RUN_NAME=${RUN_NAME}" > "$GITIGNORE_FILE"
+            fi
+            
+            # Create README.md only if it doesn't exist
+            local README_FILE="${PROJECT_DIR}/README.md"
+            if [ ! -f "$README_FILE" ]; then
+                process_template "${TEMPLATE_DIR}/readme.md.tmpl" \
+                    "PROJECT_NAME=${PROJECT_NAME}" \
+                    "RUN_NAME=${RUN_NAME}" \
+                    "SBATCH_NAME=${SBATCH_NAME}" > "$README_FILE"
+            fi
+        else
+            echo -e "${YELLOW}Warning: git not found, skipping repository initialization${NC}"
+        fi
+    fi
+    
     echo ""
     echo -e "${GREEN}Project created successfully!${NC}"
     echo ""
     echo -e "${BLUE}Project structure:${NC}"
     echo "  ${PROJECT_DIR}/"
+    if [ "$INIT_GIT" = "yes" ] && has_cmd git; then
+        echo "    ├── .git/             # Git repository"
+        echo "    ├── .gitignore        # Ignores SLURM scripts"
+        echo "    ├── README.md         # Project documentation"
+    fi
     echo "    ├── ${RUN_NAME}.sh      # Your main script (edit this)"
     echo "    ├── ${SBATCH_NAME}.sbatch    # SLURM job file"
     echo "    └── logs/              # Job output logs"

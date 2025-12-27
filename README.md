@@ -105,6 +105,9 @@ If `whiptail` or `dialog` is installed, you get a nice TUI menu. Otherwise, a te
 # Create a new project
 slx project new
 
+# Create a new project with git repository
+slx project new --git
+
 # List all projects
 slx project list
 
@@ -205,6 +208,14 @@ $WORKDIR/projects/my-project/
     └── my-project_123456.err
 ```
 
+With `--git`, it also initializes a git repository and adds:
+
+```
+├── .git/            # Git repository
+├── .gitignore       # Ignores SLURM scripts and logs
+└── README.md        # Project documentation
+```
+
 ### run.sh
 
 This is your main script. Edit it to run your code:
@@ -265,7 +276,9 @@ slx logs <TAB>               # Complete job IDs
 │   └── slx.zsh              # Zsh completion
 ├── templates/
 │   ├── run.sh.tmpl          # Run script template
-│   └── job.sbatch.tmpl      # Sbatch template
+│   ├── job.sbatch.tmpl      # Sbatch template
+│   ├── gitignore.tmpl       # Project .gitignore template
+│   └── readme.md.tmpl       # Project README template
 ├── tests/
 │   └── test_slx_init.sh     # Test suite for slx init
 ├── LICENSE                  # MIT License
